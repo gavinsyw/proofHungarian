@@ -1,0 +1,76 @@
+\documentclass{paper}
+\usepackage{cite}
+\usepackage{setspace}
+\usepackage{amsthm}
+\usepackage{amsmath}
+\usepackage{geometry}
+\geometry{top=3cm, left=3.5cm, right=3.5cm, bottom=3cm}
+\usepackage{mathrsfs}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{hyperref}
+
+\newtheorem{definition}{Definition}
+\newtheorem{theorem}{Theorem}
+
+\title{Proposal of CS263: Formal Verification of Hungarian Algorithm}
+\author{Shushu Wu, 517\\ Zhihui Xie,  \\Yiwen Song, 517030901380\\Weizhe Wang, 517030910381}
+
+\begin{document}
+\maketitle
+\begin{spacing}{1.2}
+\section{Introduction to Hungarian Algorithm}
+    The Hungarian Algorithm \cite{Hungarian} is an $O(mn)$ matching algorithm for bipartite graph proposed by H.W.Kuhn in 1955. Till now, there are many different variants of Hungarian Algorithms. Therefore, we need to specify that in our proposal Hungarian Algorithm just means Kuhn-Munkres Algorithm, the original version. \\
+    The Hungarian Algorithm is designed to find the maximum matching/perfect matching for an unweighted bipartite graph. There are some formal definitions used in the description of this algorithm.
+    \begin{definition}\label{bipartiteGraph}
+        A \textbf{bipartite graph} is a graph $\mathcal{G}=(\mathcal{V}, \mathcal{E})$, where $\mathcal{V}=\mathcal{V}_1\bigcup\mathcal{V}_2, \mathcal{V}_1\bigcap\mathcal{V}_2=\emptyset$, while $\forall e=(v_1, v_2)\in\mathcal{E}, v_1\in\mathcal{V}_1\& v_2\in\mathcal{V}_2$ or $v_1\in\mathcal{V}_2\&v_2\in\mathcal{V}_1$.
+    \end{definition}
+    \begin{definition}\label{matching}
+        A \textbf{matching} is a collection of edges $\mathcal{M}\subset\mathcal{E}$, where $\forall m_1, m_2\in\mathcal{M}, m_1$ and $m_2$ don't have a common node. From this definition we can also intuitively define \textbf{matched nodes, matched edges, unmatched nodes, unmatched edges}. We omit the definition here.
+    \end{definition}
+    \begin{definition}\label{maximumMatching}
+        A \textbf{maximum matching} is a matching that makes $|\mathcal{M}|$ the largest one.
+    \end{definition}
+    \begin{definition}\label{perfectMatching}
+        A \textbf{perfect matching} is a matching that lets all nodes be in the matching. Obviously a perfect matching is a maximum matching.
+    \end{definition}
+    \begin{definition}\label{augmentingPath}
+        An \textbf{augmenting path} $P$ is a path that connects two unmatched nodes and sequentially passes matched edges and unmatched edges.
+    \end{definition}
+    And the algorithm is shown in Algorithm \ref{HungarianAlg}.
+    \begin{algorithm}
+        \caption{Hungarian Algorithm}
+        \label{HungarianAlg}
+        \begin{algorithmic}
+            \STATE $\mathcal{M}\gets\emptyset$;
+            \STATE $\mathcal{A}\gets\mathcal{V}$;
+            \REPEAT
+                \STATE $x\gets\mathcal{A}[0]$;
+                \STATE $S\gets\{x\}$, $T\gets\emptyset$;
+                \WHILE {!$N(S)\subset T$}
+                    \STATE $y\gets N(S)-T$;
+                    \IF {$y$ IS MATCHED}
+                        \STATE $S\gets S\bigcup\{z\}, T\gets T\bigcup\{y\}$ for all $yz\in \mathcal{M}$;
+                    \ELSE
+                        \STATE $\mathcal{M}\gets \mathcal{M}\oplus E(P), \mathcal{A}\gets\mathcal{A}-\{x, y\}$;
+                        \STATE BREAK;
+                    \ENDIF
+                \ENDWHILE
+                \STATE $\mathcal{A}\gets\mathcal{A}-x$;
+            \UNTIL {$\mathcal{A}=\emptyset$}
+        \end{algorithmic}
+    \end{algorithm}
+    In order to verify the Hungarian Algorithm, we need to prove that:
+    \begin{theorem}
+        For all bipartite graphs, given a matching $\mathcal{M}$, if there exists no augmenting path, then $\mathcal{M}$ is a maximum matching.    
+    \end{theorem}
+\section{Proof Sketch}
+    We have found a Coq library containing basic declarations for graph theory\cite{github}. On the basis of the library, we can set up our own definitions related to the algorithm. \\
+    Then we may use the property of the augmenting path, where there are one more unmatched points than the matched points. By this property we may prove that if there does not exist an augmenting path, the graph is either perfect matched, or maximum matched. Because if there exists a larger matching, we can always find an augmenting path.
+\section{Possible Goals}
+    A popular variant of Hungarian Algorithm is Hopcroft-Karp Algorithm \cite{Hopcroft} developed by J.E. Hopcroft, which is more time-efficient than Hungarian Algorithm. The time complexity of Hopcroft-Karp Algorithm is $O(n^{1/2}m)$, which is $o(n^{1/2})$ times faster than the Hungarian algorithm. It marks the distance of each node to the original node during the BFS of augmenting path so that time may be saved. If we have more time after proving the Hungarian Algorithm, we would like to verify the Hopcroft-Karp Algorithm as a bonus.
+\end{spacing}
+
+\bibliographystyle{acm}
+\bibliography{Cited}
+\end{document}
