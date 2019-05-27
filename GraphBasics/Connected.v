@@ -26,7 +26,7 @@ Require Export Graphs.
 
 Section CONNECTED.
 
-Inductive Connected : V_set -> A_set -> Set :=
+Inductive Connected : V_set -> A_set -> Type :=
   | C_isolated : forall x : Vertex, Connected (V_single x) A_empty
   | C_leaf :
       forall (v : V_set) (a : A_set) (co : Connected v a) (x y : Vertex),
