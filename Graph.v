@@ -2,7 +2,13 @@ Require Import Edges.
 
 Section GRAPH.
 
-Inductive Graph : V_set -> A_set -> Type :=
+Print U_set.
+
+Print Vertex.
+
+Print V_set.
+
+Inductive Graph : V_set -> A_set -> Set :=
   | G_empty : Graph V_empty A_empty
   | G_vertex :
       forall (v : V_set) (a : A_set) (d : Graph v a) (x : Vertex),

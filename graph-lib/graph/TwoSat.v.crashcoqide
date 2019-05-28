@@ -1,0 +1,23 @@
+Require Import RamifyCoq.graph.path_lemmas.
+Require Import RamifyCoq.graph.graph_model.
+Require Import Coq.micromega.Tauto.
+Require Import Coq.Lists.List.
+
+Section TwoSat.
+
+Definition boolV : Type := nat.
+Definition valBoolV : Type := boolV*bool.
+Definition clauses : Type := valBoolV*valBoolV.
+Definition twoCNF : Type := list clauses.
+
+Definition giveboolV (v : boolV) (b : bool) : valBoolV :=
+  match b with
+  | true => (v, true)
+  | false => (v, false)
+  end.
+
+Notation tgph := (PreGraph valBoolV (clauses*bool)).
+
+ twosattograph (tsat : twoCNF) : tgph :=
+  
+
