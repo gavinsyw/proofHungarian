@@ -67,3 +67,6 @@ nra.cache
 *.synctex.gz
 *.synctex.gz(busy)
 *.pdfsync
+
+## To avoid re-fix
+CONFIGURE
