@@ -84,6 +84,13 @@ Fixpoint augPath (bg: BiGraph) (p: path) (le: list Edge) : Prop :=
 Definition noAugPath (bg: BiGraph) (le: list Edge) : Prop := forall p: path, augPath bg p le -> snd p = nil.
 
 Theorem Hungurian: forall (bg: BiGraph) (le: list Edge), matching bg le -> noAugPath bg le -> maxMatching bg le.
+Proof.
+  intros.
+  unfold maxMatching.
+  split.
+  exact H.
+  unfold not; intros.
+  repeat destruct H1.
 Admitted.
 
 End biGraph.
