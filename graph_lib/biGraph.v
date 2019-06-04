@@ -10,6 +10,8 @@ Require Import RamifyCoq.lib.relation_list.
 Require Import RamifyCoq.lib.Equivalence_ext.
 Section biGraph.
 
+(*备注：文件中有一部分定义同时用Inductive和Fixpoint等价地定义，因为不知道哪种更方便，故现都保留*)
+
 Context {Vertex Edge: Type}.
 
 Record BiGraph {EV: EqDec Vertex eq} {EE: EqDec Edge eq} := {
@@ -23,16 +25,17 @@ Record BiGraph {EV: EqDec Vertex eq} {EE: EqDec Edge eq} := {
 Context {EV: EqDec Vertex eq}.
 Context {EE: EqDec Edge eq}.
 
+(*一步可达*)
 Inductive step (bg: BiGraph): Vertex -> Vertex -> Prop :=
   | step_intro: forall e x y, evalid bg e -> src bg e = x -> dst bg e = y -> step bg x y.
 
+(* 由点定义的二分图的边*)
 Definition edge (bg: BiGraph) (n n' : Vertex) : Prop :=
-  v1 bg n /\ v2 bg n' /\ step bg n n'.
+  ((v1 bg n /\ v2 bg n') \/ (v2 bg n /\ v1 bg n')) /\ step bg n n'.
 
 Print path.
 
-Notation Gph := (PreGraph Vertex Edge).
-
+(*由边定义的二分图的边*)
 Definition strong_evalid (bg: BiGraph) (e: Edge) : Prop :=
   evalid bg e /\ ((v1 bg (src bg e) /\ v2 bg (dst bg e)) \/ (v1 bg (dst bg e) /\ v2 bg (src bg e))).
 
@@ -43,54 +46,79 @@ Fixpoint valid_path' (g: BiGraph) (p: list Edge) : Prop :=
     | n1 :: ((n2 :: _) as p') => strong_evalid g n1 /\ dst g n1 = src g n2 /\ valid_path' g p'
   end.
 
+(*二分图中的合法路径*)
 Definition valid_path (g: BiGraph) (p: path) :=
   match p with
   | (v, nil) => (v1 g v \/ v2 g v)
   | (v, (e :: _) as p') => v = src g e /\ valid_path' g p'
   end.
 
-Definition commonVertex (bg: BiGraph) (e1 e2: Edge) : Prop := strong_evalid bg e1 /\ strong_evalid bg e2 /\ ~(src bg e1 = src bg e2) /\ ~(src bg e1 = dst bg e2) /\ ~(dst bg e1 = src bg e2) /\ ~(dst bg e1 = dst bg e2).
+(* 
+Definition noCommonVertex (bg: BiGraph) (e1 e2: Edge) : Prop := strong_evalid bg e1 /\ strong_evalid bg e2 /\ ~(src bg e1 = src bg e2) /\ ~(src bg e1 = dst bg e2) /\ ~(dst bg e1 = src bg e2) /\ ~(dst bg e1 = dst bg e2).
 
-Fixpoint noCross (bg: BiGraph) (e: Edge) (p: list Edge) : Prop :=
+Fixpoint noCross (bg: BiGraph) (e: Edge) (p: Ensemble Edge) : Prop :=
   match p with
-    | nil => True
-    | n1 :: (_ as p') => ~commonVertex bg e n1 /\ noCross bg e p'
-  end.
+    | Empty_set Edge => strong_evalid bg e
+    | n1 :: (_ as p') => noCommonVertex bg e n1 /\ noCross bg e p'
+  end. *)
 
+(*匹配*)
+Inductive matching (bg: BiGraph) :
+  Ensemble Vertex ->  list Edge -> Prop :=
+  | emptyMatch : matching bg (Empty_set Vertex) nil
+  | normalMatch: forall (v: Ensemble Vertex) (p: list Edge) (e: Edge), strong_evalid bg e -> ~Ensembles.In _ v (src bg e) -> ~Ensembles.In _ v (dst bg e) -> matching bg (Ensembles.Add Vertex (Ensembles.Add Vertex v (src bg e)) (dst bg e)) (e::p).
+
+(* 
 Fixpoint matching (bg: BiGraph) (p: list Edge) : Prop :=
   match p with
     | nil => True
     | n1 :: (_ as p') => noCross bg n1 p'
-  end.
+  end. *)
 
-Definition maxMatching (bg: BiGraph) (p: list Edge) : Prop := matching bg p /\ ~(exists p': list Edge, matching bg p' /\ length p' > length p).
+(*最大匹配*)
+Definition maxMatching (bg: BiGraph) (v: Ensemble Vertex)(p: list Edge) : Prop := matching bg v p -> forall (v': Ensemble Vertex) (p': list Edge), matching bg v' p' -> length p' <= length p.
+Search Ensemble.
 
-Definition matchingPoint (bg: BiGraph) (p: list Edge) (v: Vertex) : Prop := matching bg p /\ exists e: Edge, In e p /\ (src bg e = v \/ dst bg e = v).
+(*匹配点*)
+Definition matchingPoint (bg: BiGraph) (ve: Ensemble Vertex)(p: list Edge) (v: Vertex) : Prop := matching bg ve p -> Ensembles.In _ ve v.
 
-Definition augEdge (bg: BiGraph) (p: list Edge) (e: Edge) : Prop := matching bg p /\ ((matchingPoint bg p (src bg e) /\ ~matchingPoint bg p (dst bg e)) \/ (~matchingPoint bg p (src bg e) /\ matchingPoint bg p (dst bg e))).
+(* Definition augEdge (bg: BiGraph) (p: list Edge) (e: Edge) : Prop := matching bg p /\ ((matchingPoint bg p (src bg e) /\ ~matchingPoint bg p (dst bg e)) \/ (~matchingPoint bg p (src bg e) /\ matchingPoint bg p (dst bg e))).
+ *)
 
-Fixpoint augPath' (bg: BiGraph) (p le: list Edge) : Prop :=
+(*增广路径（无起始点），一次添加两条路*)
+Fixpoint augPath' (bg: BiGraph) (ve: Ensemble Vertex) (p le: list Edge) : Prop :=
   match p with
     | nil => True
-    | e :: (_ as p') => matching bg le /\ augPath' bg p' le /\ augEdge bg le e
+    | e :: nil => ~matchingPoint bg ve le (src bg e) /\ ~matchingPoint bg ve le (src bg e)
+    | e1 :: e2 ::_ as p' => (In e2 le /\ ~In e1 le)
   end.
 
-Fixpoint augPath (bg: BiGraph) (p: path) (le: list Edge) : Prop :=
+(*正式的增广路径定义，需要起点是非匹配点*)
+Definition augPath (bg: BiGraph) (p: path) (ve: Ensemble Vertex) (le: list Edge) : Prop :=
   match p with
-    | (v, nil) => True
-    | (v, (e :: _ as p')) => v = src bg e /\ matching bg le /\ valid_path bg p /\ augPath' bg p' le /\ augEdge bg le e
+    | (v, _ as p') => (v1 bg v \/ v2 bg v) ->~Ensembles.In _ ve v -> augPath' bg ve p' le
   end.
 
-Definition noAugPath (bg: BiGraph) (le: list Edge) : Prop := forall p: path, augPath bg p le -> snd p = nil.
+(*无增广路径*)
+Definition noAugPath (bg: BiGraph) (ve: Ensemble Vertex) (le: list Edge) : Prop := forall p: path, augPath bg p ve le -> snd p = nil.
 
-Theorem Hungurian: forall (bg: BiGraph) (le: list Edge), matching bg le -> noAugPath bg le -> maxMatching bg le.
+(*匈牙利算法的正确性充分条件：如果没有增广路径，那么当前匹配是最大匹配*)
+Theorem Hungurian: forall (bg: BiGraph) (ve: Ensemble Vertex) (le: list Edge), matching bg ve le -> noAugPath bg ve le -> maxMatching bg ve le.
 Proof.
   intros.
-  unfold maxMatching.
-  split.
-  exact H.
-  unfold not; intros.
-  repeat destruct H1.
+  unfold maxMatching; intros.
+Admitted.
+
+(*匈牙利算法的正确性必要条件：如果当前匹配是最大匹配，那么不存在增广路径（Theorem）；等价地（Lemma），如果有增广路径，那么一定存在一条更大的匹配*)
+Lemma rev_Hungarian': forall (bg: BiGraph) (ve: Ensemble Vertex) (le: list Edge), ~noAugPath bg ve le -> ~maxMatching bg ve le.
+Proof.
+  intros.
+  unfold maxMatching; unfold not; intros.
+Admitted.
+
+Theorem rev_Hungarian: forall (bg: BiGraph) (ve: Ensemble Vertex) (le: list Edge), maxMatching bg ve le -> noAugPath bg ve le.
+Proof.
+  pose proof rev_Hungarian'.
 Admitted.
 
 End biGraph.
