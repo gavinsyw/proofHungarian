@@ -14,6 +14,10 @@ Section biGraph.
 
 Context {Vertex Edge: Type}.
 
+Record group {}:= {
+  
+}
+
 Record BiGraph {EV: EqDec Vertex eq} {EE: EqDec Edge eq} := {
   v1 : Ensemble Vertex;
   v2 : Ensemble Vertex;
