@@ -131,10 +131,17 @@ Inductive cross_step : (Vstate * path) -> (Vstate * path ) -> Prop :=
       cross_step (v1, (w, e2::(e1::(e3::p)))) (Vstate_update_fl (Vstate_updata_f v1 w) q, (u, e3::p)).
 (**回溯 从一个匹配点回溯到 一个匹配点*)
 
+(*
+Inductive cross_step_halt : (Vstate * path) -> Prop := 
+| BTrue: 
+*)
 
+Definition AugmentPath := Type.
 
+Definition multi_step := Type.
 
-
+(* If there is a maximum matching, there will be no augment path on the graph
+   If there is an augment path, there will always be a bigger matching.*)
 (* 
 Inductive matching (pg: PreGraph V E): Ensemble V -> list E -> Prop :=
   | emptyMatch : matching pg (Empty_set V) nil
