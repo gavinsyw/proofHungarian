@@ -14,10 +14,6 @@ Section biGraph.
 
 Context {Vertex Edge: Type}.
 
-Record group {}:= {
-  
-}
-
 Record BiGraph {EV: EqDec Vertex eq} {EE: EqDec Edge eq} := {
   v1 : Ensemble Vertex;
   v2 : Ensemble Vertex;
@@ -116,8 +112,6 @@ Admitted.
 (*匈牙利算法的正确性必要条件：如果当前匹配是最大匹配，那么不存在增广路径（Theorem）；等价地（Lemma），如果有增广路径，那么一定存在一条更大的匹配*)
 Lemma rev_Hungarian': forall (bg: BiGraph) (ve: Ensemble Vertex) (le: list Edge), ~noAugPath bg ve le -> ~maxMatching bg ve le.
 Proof.
-  intros.
-  unfold maxMatching; unfold not; intros.
 Admitted.
 
 Theorem rev_Hungarian: forall (bg: BiGraph) (ve: Ensemble Vertex) (le: list Edge), maxMatching bg ve le -> noAugPath bg ve le.
