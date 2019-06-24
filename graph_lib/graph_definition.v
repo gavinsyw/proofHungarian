@@ -1,7 +1,7 @@
-Require Import RamifyCoq.graph.find_not_in.
+(* Require Import RamifyCoq.graph.find_not_in.
 Require Import RamifyCoq.graph.graph_model.
 Require Import RamifyCoq.graph.path_lemmas.
-Require Import RamifyCoq.graph.reachable_ind.
+Require Import RamifyCoq.graph.reachable_ind. *)
 Require Import Coq.Logic.ProofIrrelevance.
 Require Import RamifyCoq.lib.Ensembles_ext.
 Require Import RamifyCoq.lib.EquivDec_ext.
@@ -12,21 +12,42 @@ Require Import RamifyCoq.lib.Equivalence_ext.
 
 Require Import Coq.Relations.Relation_Operators.
 Require Import Coq.Relations.Relation_Definitions.
-Require Import Coq.Logic.Classical_Prop.
-Require Import Coq.omega.Omega.
-Require Import Coq.Arith.EqNat.
+
+Require Import  Coq.omega.Omega.
+Require Import Coq.Logic.Classical.
 
 Arguments clos_refl_trans {A} _ _ _.
 Arguments clos_refl_trans_1n {A} _ _ _.
 Arguments clos_refl_trans_n1 {A} _ _ _.
-Arguments PreGraph _ _ {_} {_}.
 
-Section BiGraph.
+
+
 
 Definition V:=nat.
 Definition E := (V * V)%type.
-Context {EV: EqDec V eq}.
-Context {EE: EqDec E eq}.
+
+
+Definition E_eqb (u v : E) : bool :=
+match Nat.eqb (fst u) (fst v) with 
+|true  =>  Nat.eqb (snd u) (snd v)
+|false => false
+end.
+Theorem E_eqb_relf : forall u , E_eqb u u = true.
+Proof.
+  intros. destruct u. unfold E_eqb. rewrite Nat.eqb_refl. rewrite Nat.eqb_refl. auto.
+Qed.
+
+Theorem E_eqb_eq : forall u v , E_eqb u v = true <-> u= v.
+Proof.
+  intros.
+  split. intros.
+  destruct u . destruct v. unfold E_eqb in H. simpl in H.
+  remember (v0=?v) as s.
+  destruct s. symmetry in Heqs.  apply Nat.eqb_eq in Heqs.
+  apply Nat.eqb_eq in H. subst. auto. inversion H.
+  intros. subst. apply E_eqb_relf.
+Qed.
+
 
 Record BiGraph := {
   Vlist : list V;
@@ -35,31 +56,104 @@ Record BiGraph := {
   evalid : E -> Prop := fun e => In e Elist;
   src : E -> V := fun e => fst e;
   dst : E -> V := fun e => snd e;
+  eo: E -> E := fun e => (snd e, fst e);
   f : V -> bool ; (* 表示两个点集 *)
   re : forall e x y, evalid e -> src e = x -> dst e = y -> f x = negb (f y);
-  re_a : forall e, let e2:= (snd e, fst e)in  In e2 Elist ; 
+  re_a : forall e,  In (eo e) Elist ; 
   (**每两个点之间连两条边*)
 }.
 
-(* Record BiGraph := {
-  Vlist : list V;
-  Elist : list E;
-  vvalid : V -> Prop := fun x => In x Vlist;
-  evalid : E -> Prop := fun e => In e Elist;
-  src : E -> V := fun e => fst e;
-  dst : E -> V := fun e => snd e;
-  f : V -> bool ; (* 表示两个点集 *)
-  re : forall e x y, evalid e -> src e = x -> dst e = y -> f x = negb (f y);
-}. *)
+Fixpoint con_pre  (all_e: list E) (v: V) : list V :=
+match all_e with
+|nil => nil
+|e::all_e' => if (Nat.eqb (fst e) v) then (snd e)::con_pre all_e' v
+    else con_pre all_e' v
+end.
 
+Definition disjoint_edges (e1 e2 : E) : Prop :=
+  ((fst e1) <> (fst e2)) /\ ((fst e1) <> (snd e2)) /\ ((snd e1) <> (fst e2)) /\ ((snd e1) <> (snd e2)).
 
-Context {BG: BiGraph}.
+Definition disjoint_edges_set (b:BiGraph)(l:list E) : Prop :=
+  forall e1 e2: E,
+  In e1 l -> In e2 l -> e1 <> e2 -> e1 <> (eo b e2) ->  disjoint_edges e1 e2.
+
+Fixpoint remove_e (x : E) (l : list E) : list E :=
+    match l with
+      |nil => nil
+      | y::tl => if (E_eqb x y) then remove_e x tl else y::(remove_e x tl)
+    end.
+
+Theorem remove_e_In : forall l x , ~ In x (remove_e x l).
+Proof.
+  intros.
+  induction l.
+  - simpl. auto.
+  - simpl. remember (E_eqb x a ) as s. destruct s. auto.
+    unfold In. unfold not. intros. destruct H. rewrite H in Heqs. destruct x.
+    unfold E_eqb in Heqs. simpl in Heqs. rewrite Nat.eqb_refl in Heqs.
+    rewrite Nat.eqb_refl in Heqs. inversion Heqs. unfold not in IHl. apply IHl. auto.
+Qed.
+
+Theorem remove_length_in : forall x l , In x l  -> 
+       length l = S (length (remove_e x l)).
+Proof. Admitted.
+
+Theorem remove_length_not : forall x l , ~ In x l  -> 
+       length l = length (remove_e x l).
+Proof. Admitted.
+
+Fixpoint list_sub (u v :list V) : list V :=
+match v with 
+|nil => u
+|e::v' => list_sub (remove Nat.eq_dec e u ) v'
+end.
+
+Fixpoint list_sub_e (u v :list E) : list E :=
+match v with 
+|nil => u
+|e::v' => list_sub_e (remove_e  e u ) v'
+end.
+
+Fixpoint e_to_v' (g : BiGraph) (p : list E) {struct p} :
+  list V :=
+  match p with
+  | nil => nil
+  | e :: nil =>
+      src g e :: dst g e :: nil
+  | e :: (_ :: _) as el =>
+      src g e :: e_to_v' g el
+  end.
+
+Fixpoint e_to_vth (g: BiGraph) (p : list E) {struct p} : list V :=
+  match p with
+  | nil => nil
+  | e :: nil => dst g e :: src g e :: nil
+  | e :: el => dst g e :: e_to_v' g el
+  end.
+
 
 Fixpoint Inb (x: V) (l : list V) : bool :=
 match l with 
 |nil => false
 |y::l' => if  Nat.eqb x y then true else (Inb x l')
-end. 
+end.
+
+Fixpoint Inb_e (x :E ) (l:list E): bool :=
+match l with 
+|nil => false
+|y::l' => if  E_eqb  x y then true else (Inb_e x l')
+end.
+
+Theorem Inb_e_In: forall l x , Inb_e x l = true <-> In x l.
+Proof.
+  intros. induction l. - simpl. split. intros. inversion H. intros.  inversion H.
+  - simpl. remember (E_eqb x a) as s. destruct s. symmetry in Heqs.
+    rewrite E_eqb_eq in Heqs.  split. intros. left. auto. intros. auto.
+    split. intros. right. rewrite <- IHl. auto.
+    intros. destruct H.  symmetry in H. rewrite <- E_eqb_eq in H. rewrite H in Heqs.
+    inversion Heqs. apply IHl. auto.
+Qed.
+
 
 Definition Vstateb:= V -> bool.
 Definition default_Vstateb : Vstateb := (fun _ => false).
@@ -91,98 +185,69 @@ Definition Vstate_update_l (m : Vstate) (v : list V) : Vstate :=
 Definition Vstate_update_fl (m : Vstate) (v : list V) : Vstate :=
  fun x => (In x v -> False ) \/ (~ In  x  v  -> m x).
  *)
-Definition matching := list E.
 
+(* 
+(*以下都是对于图 BG 而言*)
+Context {BG: BiGraph}.
 
+(**下面是关于  匹配 的定义 *)
+Definition matching := list E. 
+(**
+里面的边不相交
+每一对匹配点之间都连接了两条有向边
+*)
 
-Fixpoint list_sub (u v :list V) : list V :=
-match v with 
-|nil => u
-|e::v' => list_sub (remove EV e u ) v'
+Definition is_matching (m: list E): Prop :=
+disjoint_edges_set BG m /\ forall e, In e m -> In (eo BG e) m /\ In e (Elist BG).
+
+Fixpoint Ma (v : V) (M :matching): (option V) := 
+match M with 
+|nil => None (**该点为非匹配点*)
+|e::m' => if Nat.eqb (src BG e) v then 
+          Some (dst BG e) else 
+            (Ma v m')
 end.
 
-Fixpoint list_sub_e (u v :list E) : list E :=
-match v with 
-|nil => u
-|e::v' => list_sub_e (remove EE e u ) v'
-end.
+(**定义了一个通用的matching*)
+Context {M : matching}.
+Hypothesis base_Match_re : is_matching M.
 
-Fixpoint e_to_v' (g : BiGraph) (p : list E) {struct p} :
-  list V :=
-  match p with
-  | nil => nil
-  | e :: nil =>
-      src g e :: dst g e :: nil
-  | e :: (_ :: _) as el =>
-      src g e :: e_to_v' g el
-  end.
+Definition Matching (v: V) : (option V) := Ma v M. (*对于一个点找到M中它的匹配点*)
 
-Fixpoint e_to_vth (g: BiGraph) (p : list E) {struct p} : list V :=
-  match p with
-  | nil => nil
-  | e :: nil => dst g e :: src g e :: nil
-  | e :: el => dst g e :: e_to_v' g el
-  end.
+
+
+(*  下面给出图的点集 边集和 某个点的连接点集 *)
+
+
 Inductive step  : V -> V -> Prop :=
 |step_intro : forall e  x y ,
                  evalid BG e ->
                  src BG e = x ->
                  dst BG e = y -> step  x y.
 
-Inductive connected (v: V) (cl : list V) : Prop :=
-|connected_intro : forall (x : V ), ( step  v x <-> In x cl) -> connected v cl .
 
-(*  给出图的点集  *)
+Definition connected (v: V) (cl : list V) : Prop :=
+  forall (x : V ),  step  v x <-> In x cl.
 
 Definition  LV:= Vlist BG.
-(* Hypothesis lise_re : forall v , In v LV <-> vvalid BG v.
- *)
+Definition LE:=Elist BG.
+
 Definition get_connectednode_func  := V -> list V.
-Definition LE:= Elist BG.
 
-(* Variable con : V -> list V. (* TODO : 怎么得到一个点的连接点集 *) *)
-Fixpoint con (v: V) (all_e: list E) : list V :=
-match all_e with
-|nil => nil
-|e::all_e' => if (eq_nat_dec (fst e) v) then (snd e)::con v all_e'
-    else con v all_e'
-end.
+Definition con : V -> list V := con_pre LE.
 
-Hypothesis conlistre : forall v , connected v (con v LE).
+Hypothesis conlistre : forall v , connected v (con v).
 
-
-Definition e_to_v (p : list E) : list V := e_to_vth BG p .
-
-Fixpoint Ma (v : V) (M :matching): (option V) := 
-match M with 
-|nil => None
-|e::m' => if Nat.eqb (src BG e) v then 
-          Some (dst BG e) else 
-            (Ma v m')
-end.
-
-
-Context {M : matching}.
-
-Definition Matching (v: V) : (option V) := Ma v M.
-Definition path : Type := (V * list E)%type.
-
-
-(* Definition crossGraph (matching) : Type :=  PreGraph 
-
- *)
-
-Print Nat.odd.
 
 Definition Max := length(LV).
 
 
-(* 找到对于一个Vstateb中从大到小的*)
-Print nth_In.
+(* 找到对于一个Vstateb中从大到小的第一个没有被访问过的*)
+
 Fixpoint conn (v: V) (v1 : Vstateb) (n:nat): V :=
 match n with
 |O => O
-|S n' =>  if Inb (S n') (con v LE) then 
+|S n' =>  if Inb (S n') (con v) then 
              (if v1 (S n') then n else conn v v1 n')
              else conn v v1 n'
 end.
@@ -190,6 +255,14 @@ end.
 Definition max_conn (v : V) (v1 : Vstateb) := conn v v1 Max.
 
 
+(*路径的定义*)
+Definition e_to_v (p : list E) : list V := e_to_vth BG p .
+
+
+Definition path : Type := (V * list E)%type.
+
+
+(**小步语义*)
 Inductive cross_step : (Vstateb * path) -> (Vstateb * path ) -> Prop := 
 | one_v : forall (u w: V ) (e1 e2 : E) (v1 : Vstateb) ,
     Matching u  = None -> let v := max_conn u v1  in 
@@ -225,14 +298,14 @@ Inductive cross_step : (Vstateb * path) -> (Vstateb * path ) -> Prop :=
       v1 u = true -> max_conn u v1 = O -> 
             In e1 M ->  ~In e2 M -> 
               src BG e1 = w1 -> dst BG e1 = u  -> src BG e2 = w2 -> dst BG e2 = w1 ->
-           cross_step (v1, (u, e1::(e2::(e3::p)))) ( Vstateb_update_fl v1 (list_sub (con u LE) (e_to_v p) ) , (w2 ,e3::p))
+           cross_step (v1, (u, e1::(e2::(e3::p)))) ( Vstateb_update_fl v1 (list_sub (con u) (e_to_v p) ) , (w2 ,e3::p))
 (**回溯到上一个匹配点*) 
 |Back_to_no : forall (u w1 w2 : V) (e1 e2 : E) (p : list E )
               (v1 : Vstateb) ,
      v1 u = true -> max_conn u v1 = O -> 
            In e1 M ->  ~In e2 M -> 
              src BG e1 = w1 -> dst BG e1 = u  -> src BG e2 = w2 -> dst BG e2 = w1 ->
-           cross_step (v1, (u, e1::(e2::nil))) ( Vstateb_update_fl v1 (list_sub (con u LE)(e_to_v p) ) , (w2 ,nil))
+           cross_step (v1, (u, e1::(e2::nil))) ( Vstateb_update_fl v1 (list_sub (con u )(e_to_v p) ) , (w2 ,nil))
 (** 回溯到初始状态即一个点*)    .
 
 
@@ -627,130 +700,33 @@ Qed.
 Definition xor_edge (e1 p: list E) : list E :=
   list_sub_e e1 p ++ list_sub_e p e1.
 
-Lemma cross_more_match: forall p a m, 
-  cross_path p -> a::m = M -> length (list_sub_e m p) + length (list_sub_e p m) <= length (list_sub_e (a :: m) p) + length (list_sub_e (remove EE a p) m).
-Proof.
-  intros.
-  induction p.
-  simpl. omega.
-  destruct p.
-  unfold remove.
-  destruct (EE a a0).
-  unfold list_sub_e at 1 3.
-  unfold Equivalence.equiv in e.
-  rewrite <- e.
-  simpl.
-  destruct (EE a a).
-  assert (length (list_sub_e (a :: nil) m) <= length (list_sub_e nil m)).
-  admit.
-  omega.
-  simpl.
-  pose proof classic (In a m).
-  destruct H1.
-  
-  
-  destruct list_sub_e at 2.
-  destruct length at 4.
-  pose proof classic (In a0 m).
-  Admitted.
-  
-  
 (*证明：根据aug_path得到的匹配确实更大*)
 Theorem Bigger : forall p , 
- aug_path p ->
-    length M   < length (xor_edge M p).
+ cross_path p ->
+    length M   <= length (xor_edge M p).
 Proof.
   intros.
   unfold xor_edge.
   rewrite app_length.
-  induction M.
-  simpl.
-  assert (length p > 0).
-  induction p. destruct H. simpl. omega.
-  omega.
-  simpl.
-  
-  Admitted.
-
-
-Lemma match_smaller: forall v a m, Ma v (a :: m) = None -> Ma v m = None /\ v <> fst a /\ v <> snd a.
-Proof.
-  intros.
-  unfold Ma in H.
-  destruct (src BG a =? v).
-  inversion H.
-  split.
-  + auto.
-  + split.
-Admitted.
-
-Print nodup.
-
-Definition disjoint_edges (e1 e2 : E) : Prop :=
-  ((fst e1) <> (fst e2)) /\ ((fst e1) <> (snd e2)) /\ ((snd e1) <> (fst e2)) /\ ((snd e1) <> (snd e2)).
-
-Definition disjoint_edges_set (l:list E) : Prop :=
-  forall e1 e2: E,
-  In e1 l -> In e2 l -> e1 <> e2 -> disjoint_edges e1 e2.
-
-Definition is_matching (m: list E): Prop :=
-disjoint_edges_set m /\ forall e, In e m -> In e (Elist BG).
-
-Theorem greater_match_to_aug_path:
-  forall m v, is_matching m -> is_matching M -> length m > length M -> Ma v m <> None -> Ma v M = None -> exists st, (multi_cstep (Vstateb_update default_Vstateb v, (v, nil)) st -> cross_halt st).
-Proof.
-  intros.
-  unfold is_matching in H.
-  destruct H.
-  unfold disjoint_edges_set in H.
-Admitted.
-
-Lemma nonmatching_to_aug_exist:
-  forall v v', Matching v = None -> In v' (con v LE) -> Matching v' = None -> aug_path ((v, v')::nil).
-Proof.
-  intros.
-  unfold aug_path.
-  unfold Matching in H.
-  unfold Matching in H1.
-  induction M.
-  + unfold In. auto.
-  + unfold Ma in H.
-    apply match_smaller in H.
-    apply match_smaller in H1.
-    
-  
-   induction a.
-    unfold Ma in H.
-    
-    unfold src in H.
-    unfold fst in H.
-    
-    simpl in H.
-    induction a.
-    destruct H1.
-  unfold Ma in H.
-Admitted.
-
-Lemma nonmatching_to_aug :
-  forall v, Matching v = None -> (exists st, cross_halt st ->
-     multi_cstep (Vstateb_update default_Vstateb v, (v, nil)) st).
-Proof.
-  intros.
-  + Admitted.
+  induction p.
+  - simpl. omega.
+  - destruct p. simpl. simpl in IHp.
+    pose proof classic (In a M). destruct H0.
+    Admitted.
 
 
 
 
+ *)
 
 
-End BiGraph.
 
 
 (* *)
 
 
 
-  
+
 
 
 

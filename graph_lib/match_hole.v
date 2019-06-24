@@ -121,6 +121,16 @@ Definition  aug_path (l : list E) : Prop :=
         aug_path_pre l /\ (1<= length l /\ ~ In (last l de) M) 
             /\ Matching (snd (hd de l)) =None /\  Matching (fst (last l de)) =None. 
 
+Theorem aug_to_cross : forall p,
+  aug_path_pre p -> cross_path p.
+Proof.
+ intros.
+ induction p.
+ inversion H.
+ destruct p. reflexivity.
+ destruct H. destruct H0. split. 2: auto.
+ right. simpl. auto.
+Qed.
 
 (**小步语义*)
 Inductive cross_step : (Vstateb * path) -> (Vstateb * path ) -> Prop := 
@@ -667,28 +677,275 @@ Proof.
 Qed.
 (**下面证明增广路得到更大的匹配*)
 
+
+(**下面证明增广路得到更大的匹配*)
+
 Definition xor_edge (e1 p: list E) : list E :=
   list_sub_e e1 p ++ list_sub_e p e1.
 
-Theorem list_sub_e_notIn : forall a p m, ~ In a m  -> 
+Lemma list_sub_left_notIn_stay : forall a p m, ~In a m ->
+  list_sub_e (a::p) m = a::list_sub_e p m.
+Proof.
+  intros.
+  revert p; induction m.
+  tauto.
+  pose proof classic (E_eqb a0 a = true).
+  destruct H0.
+  unfold not in H.
+  destruct H.
+  - unfold In.
+    left.
+    rewrite -> E_eqb_eq  in H0.
+    exact H0.
+  - apply Bool.not_true_is_false in H0.
+    simpl.
+    rewrite H0.
+    assert (~In a m).
+    unfold not.
+    unfold not in H.
+    intros. apply H.
+    simpl.
+    right. exact H1.
+    intros.
+    pose proof (IHm H1).
+    specialize (H2 (remove_e a0 p)).
+    exact H2.
+Qed.
+
+Theorem list_sub_left_notIn : forall a p m, ~ In a m  -> 
     length (list_sub_e (a::p) m)  =S (length (list_sub_e p m)).
-Proof. Admitted.
+Proof.
+  intros.
+  pose proof (list_sub_left_notIn_stay a p m).
+  pose proof (H0 H).
+  rewrite H1.
+  reflexivity.
+Qed.
+
+Lemma list_remove_notIn : forall a m, ~In a m -> 
+    remove_e a m = m.
+Proof.
+  induction m; intros.
+  auto.
+  simpl.
+  simpl in H.
+  apply not_or_and in H.
+  Search (E_eqb).
+  destruct H.
+  apply not_eq_sym in H.
+  rewrite <- E_eqb_eq in H.
+  apply Bool.not_true_is_false in H.
+  rewrite H.
+  apply IHm in H0.
+  rewrite H0.
+  auto.
+Qed.
+
+Lemma list_sub_right_notIn_stay : forall a p m, ~In a m ->
+    list_sub_e m (a::p) = list_sub_e m p.
+Proof.
+  intros.
+  simpl.
+  pose proof (list_remove_notIn a m H).
+  rewrite H0.
+  auto.
+Qed.
+
+Theorem list_sub_right_notIn : forall a p m, ~In a m -> 
+    length (list_sub_e m (a::p)) = length (list_sub_e m p).
+Proof.
+  intros.
+  pose proof (list_sub_right_notIn_stay a p m H).
+  rewrite H0.
+  auto.
+Qed.
 
 Theorem even_cons : forall {A: Type} (a:A) p , 
             Nat.even (length (a::p ))  = negb (Nat.even (length p)).
-Proof. Admitted.
+Proof.
+  intros.
+  rewrite <- S_even.
+  assert (length (a::p) = S (length p)).
+  reflexivity.
+  rewrite H.
+  tauto.
+Qed.
 
 Theorem list_sub_length_cons_notIn: forall a p m ,
          ~ In a m ->  
-         length (list_sub_e M p) + length (list_sub_e  p M) <
-           length (list_sub_e M (a :: p)) + length (list_sub_e (a :: p) M).
-Proof. Admitted.
+         length (list_sub_e m p) + length (list_sub_e  p m) <
+           length (list_sub_e m (a :: p)) + length (list_sub_e (a :: p) m).
+Proof.
+  intros.
+  pose proof (list_sub_left_notIn a p m H).
+  pose proof (list_sub_right_notIn a p m H).
+  rewrite H0.
+  rewrite H1.
+  omega.
+Qed.
+(* 
+Lemma In_notIn_neq : forall a a0 m,
+    In a m -> ~In a0 m -> E_eqb a a0 = false.
+Proof.
+  induction m; intros.
+  simpl in H.
+  destruct H.
+  simpl in H.
+  simpl in H0.
+  apply not_or_and in H0.
+  destruct H0; destruct H.
+  rewrite H in H0.
+  rewrite <- E_eqb_eq in H0.
+  apply Bool.not_true_is_false in H0.
+  exact H0.
+  pose proof (IHm H H1).
+  exact H2.
+Qed.
+
+Lemma In_notIn_neq_refl : forall a a0 m,
+    In a m -> ~In a0 m -> E_eqb a0 a = false.
+Proof.
+  induction m; intros.
+  simpl in H.
+  destruct H.
+  simpl in H.
+  simpl in H0.
+  apply not_or_and in H0.
+  destruct H0; destruct H.
+  rewrite H in H0.
+  apply not_eq_sym in H0.
+  rewrite <- E_eqb_eq in H0.
+  apply Bool.not_true_is_false in H0.
+  exact H0.
+  pose proof (IHm H H1).
+  exact H2.
+Qed.
+ *)
+(* Lemma list_sub_right_In_stay : forall a a0 p m,
+    In a m -> ~In a0 m -> ~In a p ->
+    length (list_sub_e (a0 :: m) p) = S (length (list_sub_e (a0 :: remove_e a m) p)).
+Proof.
+  intros.
+  pose proof classic (In a0 p).
+Admitted.
+ *)
+(* Theorem list_sub_right_In : forall a p m,
+    In a m -> ~In a p -> NoDup m -> length(list_sub_e m p) = S (length (list_sub_e m (a::p))).
+Proof.
+  intros.
+  revert H0; revert p; induction m; intros.
+  inversion H.
+  destruct H.
+  - simpl.
+    simpl in H.
+    rewrite <- H in H0, IHm.
+    rewrite <- H.
+    apply eq_sym in H.
+    rewrite E_eqb_relf.
+    pose proof (list_sub_left_notIn a0 m p H0).
+    pose proof (NoDup_Add).
+    specialize (H3 E a0 m (a0::m)).
+    assert (Add a0 m (a0::m)).
+    apply Add_head.
+    apply H3 in H4.
+    rewrite -> H4 in H1.
+    destruct H1.
+    pose proof (list_remove_notIn a0 m H5).
+    rewrite H6.
+    pose proof (list_sub_left_notIn a0 m p H0).
+    exact H7.
+  - pose proof (NoDup_Add).
+    specialize (H2 E a0 m (a0::m)).
+    assert (Add a0 m (a0::m)).
+    apply Add_head.
+    apply H2 in H3.
+    rewrite -> H3 in H1.
+    destruct H1.
+    pose proof (IHm H H1).
+    pose proof (In_notIn_neq a a0 m H H4).
+    specialize (H5 p).
+    simpl.
+    rewrite H6.
+    clear IHm H2 H3 H6 H1.
+    pose proof (list_sub_right_In_stay a a0 p m H H4 H0).
+    exact H1.
+Qed.
+ *)
+(* Lemma remove_e_not_in : forall a a0 p, ~In a p -> ~In a (remove_e a0 p).
+Proof.
+  unfold not; intros.
+  destruct H.
+  induction p.
+  auto.
+  pose proof classic (a= a1).
+  destruct H.
+  unfold In.
+  left. auto.
+  assert (In a p).
+  admit.
+  unfold In.
+  right.
+  exact H1.
+Admitted. *)
+
+(* Lemma list_sub_left_In_stay : forall a p m, In a m -> ~In a p -> NoDup m ->
+    list_sub_e p m = list_sub_e (a::p) m.
+Proof.
+  intros.
+  revert H0; revert p; induction m; intros.
+  destruct H.
+  simpl in H. destruct H.
+  simpl.
+  rewrite <- E_eqb_eq in H.
+  rewrite H.
+  tauto.
+  pose proof (NoDup_Add).
+  specialize (H2 E a0 m (a0::m)).
+  assert (Add a0 m (a0::m)).
+  apply Add_head.
+  apply H2 in H3.
+  rewrite H3 in H1.
+  destruct H1.
+  pose proof (IHm H H1).
+  simpl.
+  pose proof (In_notIn_neq_refl a a0 m H H4).
+  rewrite H6.
+  specialize (H5 (remove_e a0 p)).
+  assert (~In a (remove_e a0 p)).
+  apply remove_e_not_in.
+  exact H0.
+  apply H5 in H7.
+  exact H7.
+Qed.
+
+Theorem list_sub_left_In : forall a p m, In a m -> ~In a p -> NoDup m ->
+    length (list_sub_e p m) = length (list_sub_e (a::p) m).
+Proof.
+  intros.
+  pose proof (list_sub_left_In_stay a p m H H0 H1).
+  rewrite H2.
+  auto.
+Qed.
+ *)
+(* Theorem list_sub_length_cons_In: forall a p m ,
+          In a m -> ~In a p -> NoDup m ->
+         length (list_sub_e m p) + length (list_sub_e  p m) = S 
+           ( length (list_sub_e m (a :: p)) + length (list_sub_e (a :: p) m)).
+Proof.
+  intros.
+  pose proof (list_sub_left_In a p m H H0 H1).
+  pose proof (list_sub_right_In a p m H H0 H1).
+  rewrite H2.
+  rewrite H3.
+  auto.
+Qed. *)
 
 Theorem list_sub_length_cons_In: forall a p m ,
           In a m ->
          length (list_sub_e M p) + length (list_sub_e  p M) = S 
            ( length (list_sub_e M (a :: p)) + length (list_sub_e (a :: p) M)).
 Proof. Admitted.
+
 
 Theorem NotSmall : forall p , 
  cross_path p -> 1 <=length (p) -> ~ In (last p de) M ->
@@ -702,7 +959,7 @@ Proof.
   - inversion H0.
   - destruct p.
     + simpl. right. split. auto. simpl in H1. rewrite (remove_length_not a M H1).
-    rewrite (list_sub_e_notIn a nil M H1). omega.
+    rewrite (list_sub_left_notIn a nil M H1). omega.
     + destruct H. assert (1<=length(e::p)). simpl. omega.
       assert(~ In (last (e :: p) de) M ). simpl. simpl in H0. auto.
       pose proof (IHp H2 H3 H4). clear H0 IHp .
@@ -728,18 +985,9 @@ Proof.
          apply lt_n_Sm_le. auto.
 Qed.
 
-Lemma  aug_path_odd_pre1 : forall p , aug_path_pre p -> 1<= length p.
-Proof.
-  intros.
-  destruct p. inversion H. simpl. omega. Qed.
-Lemma  aug_path_odd_pre2 : forall p , aug_path p ->  ~ In (last p de) M.
-Proof.
-  intros.
-  unfold aug_path in H. destruct H as [ h [h1 h2]]. auto.
-Qed.
 
 Theorem aug_path_odd : forall p,
-  aug_path p -> 1 <=length (p) -> ~ In (last p de) M ->  Nat.even (length p) = false.
+  aug_path_pre p -> 1 <=length (p) -> ~ In (last p de) M ->  Nat.even (length p) = false.
 Proof.
   intros.
   destruct p.
@@ -758,29 +1006,19 @@ Proof.
 Qed.
 
 
+
 (*证明：根据aug_path得到的匹配确实更大*)
 Theorem Bigger : forall p , 
  aug_path p ->
     length M   < length (xor_edge M p).
 Proof.
   intros.
-  unfold xor_edge.
-  rewrite app_length.
-  destruct p.
-  inversion H.
-  induction p.
-  - unfold aug_path in H. rewrite (list_sub_e_notIn e nil M H). simpl.
-   rewrite (remove_length_not e M H). omega.
-  - clear IHp. assert (1<=length (e::a::p)). simpl. omega.
-    pose proof (aug_path_odd (e::a::p) H H0).
-    destruct H. destruct H0. destruct H. destruct H2.
-    
-    
-    
-    Admitted.
-
-
-
-
-
+  destruct H.
+  pose proof (aug_to_cross p H).
+  destruct H0. destruct H0.
+  pose proof (aug_path_odd p H H0 H3).
+  pose proof (NotSmall p  H1 H0 H3).
+  destruct H5. destruct H5. rewrite H4 in H5. inversion H5.
+  destruct H5. auto.
+Qed.
 
